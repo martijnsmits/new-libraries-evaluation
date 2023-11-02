@@ -17,6 +17,8 @@ from bigcode_eval.arguments import EvalArguments
 from bigcode_eval.evaluator import Evaluator
 from bigcode_eval.tasks import ALL_TASKS
 
+from huggingface_hub.hf_api import HfFolder
+
 
 class MultiChoice:
     def __init__(self, choices):
@@ -204,11 +206,21 @@ def get_gpus_max_memory(max_memory, num_gpus):
     print("Loading model via these GPUs & max memories: ", max_memory)
     return max_memory
 
-
+def read_access_token():
+    try:
+        with open("access_token.txt", "r") as file:
+            access_token = file.read().strip()
+        return access_token
+    except FileNotFoundError:
+        raise Exception("access_token.txt file not found. Please create the file and put your access token in it.")
+    
 def main():
     args = parse_args()
     transformers.logging.set_verbosity_error()
     datasets.logging.set_verbosity_error()
+
+    access_token = read_access_token()
+    HfFolder.save_token(access_token)
 
     if args.tasks is None:
         task_names = ALL_TASKS
@@ -270,6 +282,7 @@ def main():
             model = AutoModelForCausalLM.from_pretrained(
                 args.model,
                 **model_kwargs,
+                token=access_token,
             )
         elif args.modeltype == "seq2seq":
             warnings.warn(
@@ -278,6 +291,7 @@ def main():
             model = AutoModelForSeq2SeqLM.from_pretrained(
                 args.model,
                 **model_kwargs,
+                token=access_token,
             )
         else:
             raise ValueError(
@@ -287,7 +301,7 @@ def main():
         if args.peft_model:
             from peft import PeftModel  # dynamic import to avoid dependency on peft
 
-            model = PeftModel.from_pretrained(model, args.peft_model)
+            model = PeftModel.from_pretrained(model, args.peft_model, token=access_token)
             print("Loaded PEFT model. Merging...")
             model.merge_and_unload()
             print("Merge complete.")
@@ -297,6 +311,7 @@ def main():
             revision=args.revision,
             trust_remote_code=args.trust_remote_code,
             use_auth_token=args.use_auth_token,
+            token=access_token,
             truncation_side="left",
             padding_side="right",  # padding on the right is needed to cut off padding in `complete_code`
         )
