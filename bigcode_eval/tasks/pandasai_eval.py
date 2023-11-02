@@ -39,6 +39,7 @@ class PandasaiEval(Task):
         return doc["reference"]
     
     def postprocess_generation(self, generation, idx):
+        print("Full generation: ", generation)
         prompt = self.dataset["test"][idx]['prompt']
         gen = generation[len(prompt):]
         result = gen.split('\n', 1)[0]
